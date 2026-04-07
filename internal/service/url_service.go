@@ -3,11 +3,17 @@ package service
 import (
 	"context"
 	"errors"
-	"math/rand/v2"
+	"net/url"
+	"path"
+	"slices"
+	"strings"
 	"url-shortener/internal/storage"
 )
 
 var ErrEmptyURL = errors.New("URL cannot be empty")
+var ErrInvalidURL = errors.New("invalid URL")
+
+const maxURLLength = 2048
 
 type URLService struct {
 	storage storage.Storage
@@ -24,18 +30,31 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (
 	if originalURL == "" {
 		return "", ErrEmptyURL
 	}
-
-	for {
-		code := generateShortCode()
-		err := service.storage.SaveURL(ctx, originalURL, code)
-		if errors.Is(err, storage.ErrShortCodeAlreadyExists) {
-			continue
-		} else if err != nil {
-			return "", err
-		}
-		return code, nil
+	if len(originalURL) > maxURLLength {
+		return "", ErrInvalidURL
 	}
 
+	u, err := url.Parse(originalURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "", ErrInvalidURL
+	}
+	u.Host = strings.ToLower(u.Host)
+	if u.Path != "" && u.Path != "/" {
+		u.Path = path.Clean(u.Path)
+	}
+
+	normalizedURL := u.String()
+
+	id, err := service.storage.CreateURL(ctx, normalizedURL)
+	if err != nil {
+		return "", err
+	}
+	shortCode := encodeBase62(id)
+	err = service.storage.UpdateCode(ctx, id, shortCode)
+	if err != nil {
+		return "", err
+	}
+	return shortCode, nil
 }
 
 func (service *URLService) GetOriginalURL(ctx context.Context, shortCode string) (string, error) {
@@ -45,12 +64,16 @@ func (service *URLService) GetOriginalURL(ctx context.Context, shortCode string)
 	return service.storage.GetURL(ctx, shortCode)
 }
 
-func generateShortCode() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 8
-	code := make([]byte, length)
-	for i := range code {
-		code[i] = charset[rand.IntN(len(charset))]
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func encodeBase62(id int64) string {
+	var remainder int64
+	var result []byte
+	for id > 0 {
+		remainder = id % 62
+		result = append(result, charset[remainder])
+		id /= 62
 	}
-	return string(code)
+	slices.Reverse(result)
+	return string(result)
 }

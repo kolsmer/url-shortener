@@ -1,21 +1,38 @@
 package main
 
 import (
-	"fmt"
+	""
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"log"
+	"net/http"
+	"os"
+	"url-shortener/internal/handler"
+	"url-shortener/internal/metrics"
+	"url-shortener/internal/service"
+	"url-shortener/internal/storage"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-
 func main() {
-	//TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-	// to see how GoLand suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-	s := "gopher"
-	fmt.Printf("Hello and welcome, %s!\n", s)
+	metrics.Init()
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-	for i := 1; i <= 5; i++ {
-		//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-		// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-		fmt.Println("i =", 100/i)
+	db := storage.SetupPostgres()
+	redis := storage.SetupRedis()
+
+	baseStorage := storage.NewSQLStorage(db)
+	cachedStorage := storage.NewCachedStorage(redis)
+
+	service := service.NewURLService(cachedStorage)
+	h := handler.NewURLHandler(service, logger)
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/create", handler.URLHandler{}.Post)
+	mux.HandleFunc("/", handler.URLHandler{}.Get)
+
+	err := http.ListenAndServe(":8080", mux)
+	if err != nil {
+		return
 	}
+
 }
