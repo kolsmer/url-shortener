@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
 	"net/url"
 	"path"
 	"slices"
@@ -44,12 +45,21 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (
 	}
 
 	normalizedURL := u.String()
+	// Check if URL already exists
+	code, err := service.storage.GetCodeByURL(ctx, normalizedURL)
+	if err == nil {
+		return code, nil
+	}
+	if !errors.Is(err, storage.ErrURLNotFound) {
+		return "", err
+	}
 
+	// Not found, create new	id, err := service.storage.CreateURL(ctx, normalizedURL)
 	id, err := service.storage.CreateURL(ctx, normalizedURL)
 	if err != nil {
 		return "", err
 	}
-	shortCode := encodeBase62(id)
+	shortCode := encodeBase36(id)
 	err = service.storage.UpdateCode(ctx, id, shortCode)
 	if err != nil {
 		return "", err
@@ -64,15 +74,24 @@ func (service *URLService) GetOriginalURL(ctx context.Context, shortCode string)
 	return service.storage.GetURL(ctx, shortCode)
 }
 
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-func encodeBase62(id int64) string {
+const minCodeLength = 6
+
+var offset int64
+
+func init() {
+	offset = int64(math.Pow(36, float64(minCodeLength-1)))
+}
+
+func encodeBase36(id int64) string {
+	actualID := id + offset
 	var remainder int64
 	var result []byte
-	for id > 0 {
-		remainder = id % 62
+	for actualID > 0 {
+		remainder = actualID % 36
 		result = append(result, charset[remainder])
-		id /= 62
+		actualID /= 36
 	}
 	slices.Reverse(result)
 	return string(result)

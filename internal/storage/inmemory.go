@@ -14,16 +14,22 @@ type Storage interface {
 	UpdateCode(ctx context.Context, id int64, shortCode string) error
 	GetURL(ctx context.Context, shortCode string) (string, error)
 	CreateURL(ctx context.Context, originalURL string) (int64, error)
+	GetCodeByURL(ctx context.Context, originalURL string) (string, error)
 }
 type InMemoryStorage struct {
 	urlsByID map[int64]string
 	idByCode map[string]int64
+	codeByURL map[string]string
 	nextID   int64
 	mutex    sync.RWMutex
 }
 
 func NewInMemoryStorage() *InMemoryStorage {
-	return &InMemoryStorage{urlsByID: make(map[int64]string), idByCode: make(map[string]int64)}
+	return &InMemoryStorage{
+		urlsByID: make(map[int64]string),
+		idByCode: make(map[string]int64),
+		codeByURL: make(map[string]string),
+	}
 }
 
 func (s *InMemoryStorage) CreateURL(ctx context.Context, originalURL string) (int64, error) {
@@ -54,7 +60,21 @@ func (s *InMemoryStorage) UpdateCode(ctx context.Context, id int64, shortCode st
 		return ErrShortCodeAlreadyExists
 	}
 	s.idByCode[shortCode] = id
+	s.codeByURL[s.urlsByID[id]] = shortCode
 	return nil
+}
+
+func (s *InMemoryStorage) GetCodeByURL(ctx context.Context, originalURL string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	code, exists := s.codeByURL[originalURL]
+	if !exists {
+		return "", ErrURLNotFound
+	}
+	return code, nil
 }
 
 func (s *InMemoryStorage) GetURL(ctx context.Context, shortCode string) (string, error) {

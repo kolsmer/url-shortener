@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 )
 
 type SQLStorage struct {
@@ -46,9 +47,20 @@ func (s *SQLStorage) UpdateCode(ctx context.Context, id int64, shortCode string)
 	return nil
 }
 
+func (s *SQLStorage) GetCodeByURL(ctx context.Context, originalURL string) (string, error) {
+	var code string
+	err := s.db.QueryRowContext(ctx, "SELECT short_code FROM urls WHERE original_url = $1 AND short_code IS NOT NULL", originalURL).Scan(&code)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrURLNotFound
+		}
+		return "", err
+	}
+	return code, nil
+}
+
 func (s *SQLStorage) GetURL(ctx context.Context, shortCode string) (string, error) {
 	var originalURL string
-
 	err := s.db.QueryRowContext(ctx, "SELECT original_url FROM urls WHERE short_code = $1", shortCode).Scan(&originalURL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -59,8 +71,8 @@ func (s *SQLStorage) GetURL(ctx context.Context, shortCode string) (string, erro
 	return originalURL, nil
 }
 
-func SetupPostgres() *SQLStorage {
-	connStr := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+func SetupPostgres() *sql.DB {
+	connStr := "postgres://postgres:postgres@localhost:5432/url_shortener?sslmode=disable"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err)
@@ -69,14 +81,9 @@ func SetupPostgres() *SQLStorage {
 	if err := db.Ping(); err != nil {
 		log.Fatalf("failed to ping postgres: %v", err)
 	}
-
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS urls (
-    id serial PRIMARY KEY,
-    original_url text NOT NULL,
-    short_code text UNIQUE,
-)`)
-	if err != nil {
-		log.Fatalf("failed to create table: %v", err)
-	}
-	return NewSQLStorage(db)
+	db.SetMaxOpenConns(200)
+	db.SetMaxIdleConns(50)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
+	return db
 }

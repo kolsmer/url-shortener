@@ -1,8 +1,6 @@
 package main
 
 import (
-	""
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +8,10 @@ import (
 	"url-shortener/internal/metrics"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
+
+	"github.com/go-chi/chi/v5"
+	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -20,19 +22,20 @@ func main() {
 	redis := storage.SetupRedis()
 
 	baseStorage := storage.NewSQLStorage(db)
-	cachedStorage := storage.NewCachedStorage(redis)
-
-	service := service.NewURLService(cachedStorage)
-	h := handler.NewURLHandler(service, logger)
+	cachedStorage := storage.NewCachedStorage(baseStorage, redis)
+	svc := service.NewURLService(cachedStorage)
+	h := handler.NewURLHandler(svc, logger)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.HandleFunc("/create", handler.URLHandler{}.Post)
-	mux.HandleFunc("/", handler.URLHandler{}.Get)
 
-	err := http.ListenAndServe(":8080", mux)
-	if err != nil {
-		return
+	r := chi.NewRouter()
+	r.Post("/api/v1/shorten", h.Post)
+	r.Get("/{code}", h.Get)
+
+	logger.Println("Server listening on :8080")
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		logger.Fatalf("Server error: %v", err)
 	}
 
 }

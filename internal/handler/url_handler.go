@@ -5,9 +5,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
+	"github.com/go-chi/chi/v5"
 )
 
 type URLHandler struct {
@@ -69,11 +69,7 @@ func (h *URLHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	if r.URL.Path == "/" {
-		http.NotFound(w, r)
-		return
-	}
-	code := strings.TrimPrefix(r.URL.Path, "/")
+	code := chi.URLParam(r, "code")
 	if code == "" {
 		http.Error(w, "Code not provided", http.StatusBadRequest)
 		return
