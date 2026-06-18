@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -72,7 +73,10 @@ func (s *SQLStorage) GetURL(ctx context.Context, shortCode string) (string, erro
 }
 
 func SetupPostgres() *sql.DB {
-	connStr := "postgres://postgres:postgres@localhost:5432/url_shortener?sslmode=disable"
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		connStr = "postgres://postgres:postgres@localhost:5432/url_shortener?sslmode=disable"
+	}
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err)

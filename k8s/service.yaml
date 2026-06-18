@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: url-shortener-service
+spec:
+  selector:
+    app: url-shortener
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+  type: LoadBalancer

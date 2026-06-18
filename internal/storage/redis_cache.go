@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"sync/atomic"
 	"time"
 	"url-shortener/internal/metrics"
@@ -12,7 +13,11 @@ import (
 )
 
 func SetupRedis() *redis.Client {
-	return redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	addr := os.Getenv("REDIS_URL")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+	return redis.NewClient(&redis.Options{Addr: addr})
 }
 
 type CachedStorage struct {
