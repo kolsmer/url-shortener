@@ -8,16 +8,16 @@ import (
 	"url-shortener/internal/grpc_handler"
 	"url-shortener/internal/handler"
 	"url-shortener/internal/metrics"
+	"url-shortener/internal/middleware"
+	pb "url-shortener/internal/proto"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
-	pb "url-shortener/internal/proto"
 
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-
 )
 
 func main() {
@@ -30,6 +30,16 @@ func main() {
 	baseStorage := storage.NewSQLStorage(db)
 	cachedStorage := storage.NewCachedStorage(baseStorage, redis)
 	svc := service.NewURLService(cachedStorage)
+
+	// User
+
+	userStorage := storage.NewSQLUserStorage(db)
+	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
+	authSvc := service.NewAuthService(userStorage,jwtSecret)
+	authHandler := handler.NewAuthHandler(authSvc, logger)
+
+
+
 	// gRPC
 
 	go func() {
@@ -48,13 +58,15 @@ func main() {
 
 	// HTTP
 	h := handler.NewURLHandler(svc, logger)
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
 
 	r := chi.NewRouter()
-	r.Post("/api/v1/shorten", h.Post)
 	r.Get("/{code}", h.Get)
+	r.Handle("/metrics", promhttp.Handler())
 
+	r.Post("/api/v1/register", authHandler.Register)
+	r.Post("/api/v1/login", authHandler.Login)
+
+	r.With(middleware.Auth(authSvc)).Post("/api/v1/shorten",h.Post)
 	logger.Println("Server listening on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		logger.Fatalf("Server error: %v", err)

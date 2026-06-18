@@ -6,3 +6,4 @@
 .env
 coverage.html
 .idea
+INTERNALS.md
