@@ -54,7 +54,6 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (
 		return "", err
 	}
 
-	// Not found, create new	id, err := service.storage.CreateURL(ctx, normalizedURL)
 	id, err := service.storage.CreateURL(ctx, normalizedURL)
 	if err != nil {
 		return "", err

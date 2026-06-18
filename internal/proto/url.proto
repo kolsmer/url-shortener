@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package url;
+
+option go_package = "url-shortener/internal/proto";
+
+service URLService {
+    rpc ShortenURL(ShortenRequest) returns (ShortenResponse);
+    rpc GetOriginalURL(GetURLRequest) returns (GetURLResponse);
+
+}
+
+message ShortenRequest {
+    string url = 1;
+}
+
+message ShortenResponse {
+    string code = 1;
+    string short_code = 2;
+
+}
+
+message GetURLRequest {
+    string code = 1;
+}
+
+message GetURLResponse {
+    string original_url = 1;
+}

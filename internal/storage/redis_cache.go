@@ -51,11 +51,10 @@ func (s *CachedStorage) GetURL(ctx context.Context, shortCode string) (string, e
 	url, err := s.base.GetURL(ctx, shortCode)
 	if err != nil {
 		if errors.Is(err, ErrURLNotFound) {
-			if err = s.redis.Set(ctx, shortCode, nullCacheValue, time.Minute).Err(); err != nil {
-				log.Printf("redis set NULL error: %v", err)
+			if setErr := s.redis.Set(ctx, shortCode, nullCacheValue, time.Minute).Err(); setErr != nil {
+				log.Printf("redis set NULL error: %v", setErr)
 			}
 		}
-
 		return "", err
 	}
 	if err = s.redis.Set(ctx, shortCode, url, time.Minute*5).Err(); err != nil {
@@ -110,13 +109,13 @@ func (s *CachedStorage) GetCodeByURL(ctx context.Context, originalURL string) (s
 	code, err := s.base.GetCodeByURL(ctx, originalURL)
 	if err != nil {
 		if errors.Is(err, ErrURLNotFound) {
-			if err = s.redis.Set(ctx, cacheKey, nullCacheValue, time.Minute).Err(); err != nil {
-				log.Printf("redis set NULL error: %v", err)
+			if setErr := s.redis.Set(ctx, cacheKey, nullCacheValue, time.Minute).Err(); setErr != nil {
+				log.Printf("redis set NULL error: %v", setErr)
 			}
 		}
 		return "", err
 	}
-	if err = s.redis.Set(ctx, cacheKey, code, time.Minute*5).Err(); err != nil {
+	if err = s.redis.Set(ctx, cacheKey, code, time.Minute*10).Err(); err != nil {
 		log.Printf("failed to cache code in Redis: %v", err)
 	}
 	return code, nil

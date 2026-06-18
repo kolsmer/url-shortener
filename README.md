@@ -27,7 +27,8 @@ curl -X POST http://localhost:8080/api/v1/shorten \
 **Язык:** Go (Golang) — быстрый язык программирования
 
 **Компоненты:**
-- **HTTP сервер** — принимает запросы на сокращение и редирект
+- **HTTP сервер** — принимает публичные запросы на сокращение и редирект (порт 8080)
+- **gRPC сервер** — внутренний интерфейс для межсервисного взаимодействия (порт 50051)
 - **PostgreSQL** — база данных, хранит оригинальные URL и коды
 - **Redis** — кэш в оперативной памяти для быстрого доступа
 - **Prometheus** — сбор метрик для мониторинга
@@ -58,7 +59,9 @@ go run cmd/server/main.go
 
 ## API
 
-### Создание короткой ссылки
+### HTTP (публичный)
+
+#### Создание короткой ссылки
 ```
 POST /api/v1/shorten
 Content-Type: application/json
@@ -74,19 +77,37 @@ Content-Type: application/json
 }
 ```
 
-### Переход по ссылке
+#### Переход по ссылке
 ```
 GET /{code}
 ```
 
 **Ответ:** 307 редирект на оригинальный URL
 
-### Просмотр метрик
+#### Просмотр метрик
 ```
 GET /metrics
 ```
 
 Prometheus формат для мониторинга
+
+### gRPC (внутренний, порт 50051)
+
+Схема описана в `internal/proto/url.proto`. Два метода:
+
+```protobuf
+rpc ShortenURL(ShortenRequest) returns (ShortenResponse);
+rpc GetOriginalURL(GetURLRequest) returns (GetURLResponse);
+```
+
+Пример вызова через grpcurl:
+```bash
+grpcurl -plaintext -d '{"url": "https://example.com/long/path"}' \
+  localhost:50051 url.URLService/ShortenURL
+
+grpcurl -plaintext -d '{"code": "baaaap"}' \
+  localhost:50051 url.URLService/GetOriginalURL
+```
 
 ## Результаты нагрузочного тестирования (k6)
 

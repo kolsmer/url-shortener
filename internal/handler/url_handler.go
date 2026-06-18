@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -75,16 +76,29 @@ func (h *URLHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originalURL, err := h.service.GetOriginalURL(ctx, code)
-	if errors.Is(err, storage.ErrURLNotFound) {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+	const maxRetries = 3
+	var originalURL string
+	var lastErr error
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var err error
+		originalURL, err = h.service.GetOriginalURL(ctx, code)
+		if err == nil {
+			http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
+			return
+		}
+		lastErr = err
+		
+		if errors.Is(err, storage.ErrURLNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		
+		if attempt < maxRetries-1 {
+			time.Sleep(time.Duration((attempt+1)*10) * time.Millisecond)
+		}
 	}
-	if err != nil {
-		h.logger.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
-
+	
+	h.logger.Println(lastErr)
+	w.WriteHeader(http.StatusInternalServerError)
 }
