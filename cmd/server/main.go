@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 	"url-shortener/internal/grpc_handler"
 	"url-shortener/internal/handler"
 	"url-shortener/internal/metrics"
@@ -41,15 +45,15 @@ func main() {
 
 
 	// gRPC
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		logger.Fatalf("gRPC listen error: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	pb.RegisterURLServiceServer(grpcServer, grpc_handler.NewURLGRPCHandler(svc))
+	reflection.Register(grpcServer)
 
 	go func() {
-		lis, err := net.Listen("tcp", ":50051")
-		if err != nil {
-			logger.Fatalf("gRPC listen error: %v", err)
-		}
-		grpcServer := grpc.NewServer()
-		pb.RegisterURLServiceServer(grpcServer, grpc_handler.NewURLGRPCHandler(svc))
-		reflection.Register(grpcServer)
 		logger.Println("gRPC server listening on :50051")
 		if err := grpcServer.Serve(lis); err != nil {
 			logger.Fatalf("gRPC server error: %v", err)
@@ -68,8 +72,24 @@ func main() {
 
 	r.With(middleware.Auth(authSvc)).Post("/api/v1/shorten",h.Post)
 	logger.Println("Server listening on :8080")
-	if err := http.ListenAndServe(":8080", r); err != nil {
-		logger.Fatalf("Server error: %v", err)
-	}
+	
+	srv := &http.Server{Addr: ":8080", Handler: r}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func () {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			logger.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Println("Shutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	srv.Shutdown(shutdownCtx)
+	grpcServer.GracefulStop()
 
 }
