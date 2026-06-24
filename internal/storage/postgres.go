@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"url-shortener/internal/models"
 )
 
 type SQLStorage struct {
@@ -18,12 +19,12 @@ func NewSQLStorage(db *sql.DB) *SQLStorage {
 	return &SQLStorage{db: db}
 }
 
-func (s *SQLStorage) CreateURL(ctx context.Context, originalURL string) (int64, error) {
+func (s *SQLStorage) CreateURL(ctx context.Context, originalURL string, userID int64) (int64, error) {
 	if originalURL == "" {
 		return 0, ErrEmptyURL
 	}
 	var id int64
-	err := s.db.QueryRowContext(ctx, "INSERT INTO urls (original_url) VALUES ($1) RETURNING id", originalURL).Scan(&id)
+	err := s.db.QueryRowContext(ctx, "INSERT INTO urls (original_url, user_id) VALUES ($1, $2) RETURNING id", originalURL, userID).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
@@ -70,6 +71,24 @@ func (s *SQLStorage) GetURL(ctx context.Context, shortCode string) (string, erro
 		return "", err
 	}
 	return originalURL, nil
+}
+
+func (s *SQLStorage) GetURLsByUserID(ctx context.Context, userID int64) ([]models.URL, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT original_url, short_code, created_at, user_id FROM urls WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var urls []models.URL
+	for rows.Next() {
+		var u models.URL
+		if err := rows.Scan(&u.OriginalURL, &u.ShortCode, &u.CreatedAt, &u.UserID); err != nil {
+			return nil, err
+		}
+		urls = append(urls, u)
+	}
+	return urls, rows.Err()
 }
 
 func SetupPostgres() *sql.DB {

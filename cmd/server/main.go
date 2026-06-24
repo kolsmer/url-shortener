@@ -71,8 +71,10 @@ func main() {
 	r.Post("/api/v1/login", authHandler.Login)
 
 	r.With(middleware.Auth(authSvc)).Post("/api/v1/shorten",h.Post)
+
+	r.With(middleware.Auth(authSvc)).Get("/api/v1/my-urls", h.GetUserURLs)
 	logger.Println("Server listening on :8080")
-	
+
 	srv := &http.Server{Addr: ":8080", Handler: r}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

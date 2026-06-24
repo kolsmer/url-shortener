@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"url-shortener/internal/middleware"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -42,7 +44,8 @@ func (h *URLHandler) Post(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only one JSON object allowed", http.StatusBadRequest)
 		return
 	}
-	code, err := h.service.ShortenURL(ctx, req.URL)
+	userID, _ := middleware.GetUserID(ctx)
+	code, err := h.service.ShortenURL(ctx, req.URL, userID)
 	if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURL) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -101,4 +104,20 @@ func (h *URLHandler) Get(w http.ResponseWriter, r *http.Request) {
 	
 	h.logger.Println(lastErr)
 	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	urls, err := h.service.GetUserURLs(r.Context(), userID)
+	if err != nil {
+		h.logger.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
 }

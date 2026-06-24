@@ -4,8 +4,13 @@ import (
 	"net/http"
 	"strings"
 	"url-shortener/internal/service"
+	"context"
 
 )
+
+type contextKey string
+
+const userIDKey contextKey = "user_id"
 
 func Auth(svc *service.AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -20,13 +25,19 @@ func Auth(svc *service.AuthService) func(http.Handler) http.Handler {
 				return
 			}
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-			_, err := svc.ValidateToken(tokenString)
+			userID, err := svc.ValidateToken(tokenString)
 			if err != nil {
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return
 			}
-			next.ServeHTTP(w, r)
+			ctx := context.WithValue(r.Context(), userIDKey, userID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 
 		})
 	}
+}
+
+func GetUserID(ctx context.Context) (int64, bool) {
+	userID, ok := ctx.Value(userIDKey).(int64)
+	return userID, ok
 }

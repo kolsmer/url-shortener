@@ -8,6 +8,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"url-shortener/internal/models"
 	"url-shortener/internal/storage"
 )
 
@@ -24,7 +25,7 @@ func NewURLService(storage storage.Storage) *URLService {
 	return &URLService{storage: storage}
 }
 
-func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (string, error) {
+func (service *URLService) ShortenURL(ctx context.Context, originalURL string, userID int64) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -45,7 +46,6 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (
 	}
 
 	normalizedURL := u.String()
-	// Check if URL already exists
 	code, err := service.storage.GetCodeByURL(ctx, normalizedURL)
 	if err == nil {
 		return code, nil
@@ -54,7 +54,7 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string) (
 		return "", err
 	}
 
-	id, err := service.storage.CreateURL(ctx, normalizedURL)
+	id, err := service.storage.CreateURL(ctx, normalizedURL, userID)
 	if err != nil {
 		return "", err
 	}
@@ -95,3 +95,11 @@ func encodeBase36(id int64) string {
 	slices.Reverse(result)
 	return string(result)
 }
+
+func (service *URLService) GetUserURLs(ctx context.Context, userID int64) ([]models.URL, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return service.storage.GetURLsByUserID(ctx, userID)
+}
+

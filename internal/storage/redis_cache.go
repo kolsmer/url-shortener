@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 	"url-shortener/internal/metrics"
+	"url-shortener/internal/models"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -81,8 +82,8 @@ func (s *CachedStorage) UpdateCode(ctx context.Context, id int64, shortCode stri
 	return nil
 }
 
-func (s *CachedStorage) CreateURL(ctx context.Context, originalURL string) (int64, error) {
-	return s.base.CreateURL(ctx, originalURL)
+func (s *CachedStorage) CreateURL(ctx context.Context, originalURL string, userID int64) (int64, error) {
+	return s.base.CreateURL(ctx, originalURL, userID)
 }
 
 func (s *CachedStorage) Stats() (hits int64, miss int64, hitRate float64) {
@@ -124,4 +125,8 @@ func (s *CachedStorage) GetCodeByURL(ctx context.Context, originalURL string) (s
 		log.Printf("failed to cache code in Redis: %v", err)
 	}
 	return code, nil
+}
+
+func (s *CachedStorage) GetURLsByUserID(ctx context.Context, userID int64) ([]models.URL, error) {
+	return s.base.GetURLsByUserID(ctx, userID)
 }

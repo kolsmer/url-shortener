@@ -23,7 +23,7 @@ func NewURLGRPCHandler(svc *service.URLService) *URLGRPCHandler {
 }
 
 func (h *URLGRPCHandler) ShortenURL(ctx context.Context, req *pb.ShortenRequest) (*pb.ShortenResponse, error) {
-	code,err := h.service.ShortenURL(ctx, req.GetUrl())
+	code, err := h.service.ShortenURL(ctx, req.GetUrl(), 0)
 	if errors.Is(err, storage.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURL) {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
