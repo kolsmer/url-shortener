@@ -22,10 +22,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
+	"url-shortener/internal/telemetry"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
 	metrics.Init()
+	shutdown , err := telemetry.InitTracer(context.Background())
+	if err != nil {
+		log.Fatalf("failed to initialize tracer: %v", err)
+	}
+	defer shutdown(context.Background())
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	db := storage.SetupPostgres()
@@ -75,7 +83,7 @@ func main() {
 	r.With(middleware.Auth(authSvc)).Get("/api/v1/my-urls", h.GetUserURLs)
 	logger.Println("Server listening on :8080")
 
-	srv := &http.Server{Addr: ":8080", Handler: r}
+	srv := &http.Server{Addr: ":8080", Handler: otelhttp.NewHandler(r, "url-shortener")}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

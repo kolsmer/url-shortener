@@ -54,7 +54,7 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 		s := factory()
 		ctx := context.Background()
 
-		id, err := s.CreateURL(ctx, "https://example.com")
+		id, err := s.CreateURL(ctx, "https://example.com", 0)
 		if err != nil {
 			t.Fatalf("createURL failed: %v", err)
 		}
@@ -78,8 +78,8 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 	t.Run("DuplicateCode", func(t *testing.T) {
 		s := factory()
 		ctx := context.Background()
-		id1, _ := s.CreateURL(ctx, "https://example1.com")
-		id2, _ := s.CreateURL(ctx, "https://example2.com")
+		id1, _ := s.CreateURL(ctx, "https://example1.com", 0)
+		id2, _ := s.CreateURL(ctx, "https://example2.com", 0)
 
 		_ = s.UpdateCode(ctx, id1, "abc123")
 		err := s.UpdateCode(ctx, id2, "abc123")
@@ -105,7 +105,7 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 		for i := 0; i < n; i++ {
 			go func(i int) {
 				url := fmt.Sprintf("https://example.com/%d", i)
-				id, err := s.CreateURL(ctx, url)
+				id, err := s.CreateURL(ctx, url, 0)
 				if err != nil {
 					errChan <- err
 					return
@@ -140,7 +140,7 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 	t.Run("GetURLIdempotent", func(t *testing.T) {
 		s := factory()
 		ctx := context.Background()
-		id, err := s.CreateURL(ctx, "https://example.com")
+		id, err := s.CreateURL(ctx, "https://example.com", 0)
 		if err != nil {
 			t.Fatalf("createURL failed: %v", err)
 		}
@@ -162,8 +162,8 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 		s := factory()
 		ctx := context.Background()
 
-		id1, _ := s.CreateURL(ctx, "https://example1.com")
-		id2, _ := s.CreateURL(ctx, "https://example2.com")
+		id1, _ := s.CreateURL(ctx, "https://example1.com", 0)
+		id2, _ := s.CreateURL(ctx, "https://example2.com", 0)
 
 		err := s.UpdateCode(ctx, id1, "abc123")
 		if err != nil {
@@ -183,7 +183,7 @@ func runStorageTests(t *testing.T, factory func() Storage) {
 		ctx := context.Background()
 		prevID := int64(0)
 		for i := 0; i < 100; i++ {
-			id, err := s.CreateURL(ctx, "https://example.com")
+			id, err := s.CreateURL(ctx, "https://example.com", 0)
 			if err != nil {
 				t.Fatalf("createURL failed: %v", err)
 			}
