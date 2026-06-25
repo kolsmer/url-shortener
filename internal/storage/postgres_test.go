@@ -1,3 +1,5 @@
+//go:build integration
+
 package storage
 
 import (
@@ -23,7 +25,8 @@ func setupPostgresTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS urls (
 					id BIGSerial PRIMARY KEY,
 					original_url TEXT NOT NULL,
-					short_code TEXT UNIQUE
+					short_code TEXT UNIQUE,
+					user_id INTEGER
                 )
 		`)
 	if err != nil {

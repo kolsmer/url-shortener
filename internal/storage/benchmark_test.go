@@ -44,7 +44,7 @@ func BenchmarkCreateURL(b *testing.B) {
 
 		for pb.Next() {
 			url := fmt.Sprintf("https://example.com/%d", i)
-			_, err := s.CreateURL(ctx, url)
+			_, err := s.CreateURL(ctx, url, 0)
 			if err != nil {
 				b.Fatalf("CreateURL failed: %v", err)
 			}
@@ -68,7 +68,7 @@ func BenchmarkFullFlow(b *testing.B) {
 		for pb.Next() {
 			url := fmt.Sprintf("https://example.com/%d", i)
 
-			id, err := s.CreateURL(ctx, url)
+			id, err := s.CreateURL(ctx, url, 0)
 			if err != nil {
 				b.Fatalf("create failed: %v", err)
 			}
@@ -100,7 +100,7 @@ func BenchmarkReadHeavy(b *testing.B) {
 	ctx := context.Background()
 	b.SetParallelism(2)
 	for i := 0; i < 1000; i++ {
-		id, _ := s.CreateURL(ctx, fmt.Sprintf("https://example.com/%d", i))
+		id, _ := s.CreateURL(ctx, fmt.Sprintf("https://example.com/%d", i), 0)
 		_ = s.UpdateCode(ctx, id, fmt.Sprintf("code-%d", i))
 	}
 
