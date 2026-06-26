@@ -34,7 +34,17 @@ spec:
                 secretKeyRef:
                   name: url-shortener-secret
                   key: redis-url
-
-                
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
 
 

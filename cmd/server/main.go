@@ -74,6 +74,17 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/{code}", h.Get)
 	r.Handle("/metrics", promhttp.Handler())
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if err := db.PingContext(r.Context()); err != nil {
+			http.Error(w, "db unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 
 	r.Post("/api/v1/register", authHandler.Register)
 	r.Post("/api/v1/login", authHandler.Login)

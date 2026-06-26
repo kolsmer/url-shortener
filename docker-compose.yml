@@ -59,7 +59,15 @@ services:
       - "4317:4317"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
-    
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: url-shortener-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - app
 
 volumes:
   postgres_data:
