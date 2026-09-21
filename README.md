@@ -109,6 +109,44 @@ grpcurl -plaintext -d '{"code": "baaaap"}' \
   localhost:50051 url.URLService/GetOriginalURL
 ```
 
+## JWT и авторизация
+
+Чтобы пользоваться защищенными ручками, нужен токен.
+
+### Последовательность работы
+
+1. Зарегистрировать пользователя:
+```bash
+curl -X POST http://localhost:8080/api/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"a@a.com","password":"123456"}'
+```
+
+2. Войти и получить JWT:
+```bash
+curl -X POST http://localhost:8080/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"a@a.com","password":"123456"}'
+```
+
+3. Использовать токен в `Authorization`:
+```bash
+curl -X POST http://localhost:8080/api/v1/shorten \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://google.com"}'
+```
+
+### Быстро отключить JWT для локальной разработки
+
+Если не хочется передавать токен, можно временно отключить проверку:
+```bash
+export DISABLE_JWT_AUTH=1
+go run cmd/server/main.go
+```
+
+После этого защищенные роуты будут работать без `Authorization`, а `user_id` подставится автоматически.
+
 ## Результаты нагрузочного тестирования (k6)
 
 Тест моделировал реальную нагрузку: от 200 до 400 одновременных пользователей, каждый создает короткую ссылку и переходит по ней.
