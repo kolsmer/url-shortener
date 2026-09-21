@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 	"url-shortener/internal/middleware"
+	"url-shortener/internal/models"
 	"url-shortener/internal/service"
 	"url-shortener/internal/storage"
 
@@ -44,7 +45,11 @@ func (h *URLHandler) Post(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only one JSON object allowed", http.StatusBadRequest)
 		return
 	}
-	userID, _ := middleware.GetUserID(ctx)
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		http.Error(w, "missing user id", http.StatusUnauthorized)
+		return
+	}
 	code, err := h.service.ShortenURL(ctx, req.URL, userID)
 	if errors.Is(err, service.ErrEmptyURL) || errors.Is(err, service.ErrInvalidURL) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -82,7 +87,7 @@ func (h *URLHandler) Get(w http.ResponseWriter, r *http.Request) {
 	const maxRetries = 3
 	var originalURL string
 	var lastErr error
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		var err error
 		originalURL, err = h.service.GetOriginalURL(ctx, code)
@@ -91,33 +96,42 @@ func (h *URLHandler) Get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		lastErr = err
-		
+
 		if errors.Is(err, storage.ErrURLNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		
+
 		if attempt < maxRetries-1 {
 			time.Sleep(time.Duration((attempt+1)*10) * time.Millisecond)
 		}
 	}
-	
+
 	h.logger.Println(lastErr)
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
 func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+	ctx := r.Context()
+	userID, ok := middleware.GetUserID(ctx)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		http.Error(w, "missing user id", http.StatusUnauthorized)
 		return
 	}
-	urls, err := h.service.GetUserURLs(r.Context(), userID)
+
+	urls, err := h.service.GetUserURLs(ctx, userID)
 	if err != nil {
 		h.logger.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "failed to get urls", http.StatusInternalServerError)
 		return
 	}
+
+	if urls == nil {
+		urls = []models.URL{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(urls)
+	if err := json.NewEncoder(w).Encode(urls); err != nil {
+		h.logger.Println(err)
+	}
 }

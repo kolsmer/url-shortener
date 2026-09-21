@@ -10,6 +10,7 @@ import (
 	"strings"
 	"url-shortener/internal/models"
 	"url-shortener/internal/storage"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 )
@@ -48,7 +49,7 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string, u
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		if err == nil {
 			span.SetStatus(codes.Error, "invalid URL scheme")
-		} else{
+		} else {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		}
@@ -61,8 +62,11 @@ func (service *URLService) ShortenURL(ctx context.Context, originalURL string, u
 
 	normalizedURL := u.String()
 	code, err := service.storage.GetCodeByURL(ctx, normalizedURL)
-	if err == nil {
+	if err == nil && code != "" {
 		return code, nil
+	}
+	if err == nil {
+		err = storage.ErrURLNotFound
 	}
 	if !errors.Is(err, storage.ErrURLNotFound) {
 		span.RecordError(err)
@@ -126,4 +130,3 @@ func (service *URLService) GetUserURLs(ctx context.Context, userID int64) ([]mod
 	}
 	return service.storage.GetURLsByUserID(ctx, userID)
 }
-

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 	"url-shortener/internal/models"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 )
@@ -88,7 +89,7 @@ func (s *SQLStorage) GetCodeByURL(ctx context.Context, originalURL string) (stri
 		return "", err
 	}
 	var code string
-	err := s.db.QueryRowContext(ctx, "SELECT short_code FROM urls WHERE original_url = $1 AND short_code IS NOT NULL", originalURL).Scan(&code)
+	err := s.db.QueryRowContext(ctx, "SELECT short_code FROM urls WHERE original_url = $1 AND short_code IS NOT NULL AND short_code <> ''", originalURL).Scan(&code)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrURLNotFound
